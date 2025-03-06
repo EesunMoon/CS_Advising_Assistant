@@ -1,49 +1,36 @@
-# CS Advising Assistant
-A chatbot system using LLMs to assist in Computer Science advising.
+# 🎓 CS Advising Assistant (LangChain + DeepSeek + RAG)
 
-## Workflow
+## 🚀 Project Overview
+This project replaces **OpenAI API** with **Ollama-powered DeepSeek models**, integrating **LangChain** to build an AI-driven **CS Advising Assistant** using **RAG (Retrieval-Augmented Generation)**.
 
-1. **User Data Collection**
-
-Collect user inputs.
-
-2. **Knowledge Base Retrieval**
-
-Convert a CSV file into a Knowledge Base.
-
-3. **Use Vector Embedding (DeepSeek).**
-
-Apply FAISS Similarity Search to retrieve the top-k most relevant entries.
-
-4. **Prompt Construction**
-
-Construct prompts using user data, the user’s question, and relevant FAQ entries.
-
-5. **Response Generation**
-
-Send the prompt to Ollama LLM.
-
-Process the generated response with Out-of-Scope Query Detection.
+- **No OpenAI API Calls** → Runs entirely on **Ollama-powered DeepSeek models**
+- **LangChain Integration** → Context retrieval and RAG-based response generation
+- **FAISS for Efficient Search** → Vector embedding-based document retrieval
+- **Conversation Memory** → Maintains context for better responses
+- **Prompt Tuning** → Enhances response quality
 
 
-## Technologies Stack
+## 🛠 Tech Stack
+### **LLM Execution**
+- **Ollama** → Runs **DeepSeek models** locally  
+- **DeepSeek-Chat (via Ollama)** → Generates responses without API costs  
+- **LangChain ConversationalRetrievalChain** → Enables context-aware responses  
 
-### Chatbot Deployment
+### **Vector Embedding & Retrieval**
+- **FAISS** → Efficient similarity search for FAQ retrieval  
+- **Hugging Face Sentence Embeddings** → Replaces OpenAI’s embedding API  
 
-- Cloud infrastructure: GCP, Azure, AWS
+### **RAG Implementation**
+- **Retrieves relevant FAQ entries**  
+- **Augments context** before generating responses  
+- **Optimized prompt tuning for response generation**  
 
-- Performance Logging: Caching to reduce API call costs
+### **Out-of-Scope Query Handling**
+- **Vector embedding clustering** to detect irrelevant queries  
 
-### Embedding
-
-- DeepSeek Vector Embedding (previously OpenAI GPT-4o)
-
-- FAISS: Similarity-based search
-
-### LLM
-
-DeepSeek LLM, LLaMA
-
-### Out-of-Scope Query Handling
-
-Vector embedding Clustering
+## 🔍 How It Works
+1. Retrieves the most relevant FAQ entries using FAISS & DeepSeek Embeddings
+2. Retrieves additional context using LangChain Retriever
+3. Optimizes prompts for better responses using Prompt Tuning
+4. Generates responses using DeepSeek LLM via Ollama
+5. Detects out-of-scope queries using vector embedding clustering
