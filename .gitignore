@@ -4,3 +4,4 @@ Reference/
 .env
 advising/
 application.py
+text.py
