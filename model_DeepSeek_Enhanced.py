@@ -341,10 +341,47 @@ class EnhancedCSAssistant:
     def _build_prompt(self, query: str, context_docs: List[Document], history_str) -> str:
         """Build prompt with clear guidelines and structure"""
         context_str = "\n\n".join([doc.page_content for doc in context_docs])
-        
         prompt_template = f"""
-        You are a Computer Science Advising assistant for Columbia University's CS Advising team.
-        Your task is to help students understand course requirements and make informed decisions about their academic path.
+            You are a CS Academic Advising Assistant at Columbia University.
+
+            Your goal is to answer the student's current question based on:
+            1. CONTEXT: reliable information retrieved from university sources
+            2. CHAT HISTORY: prior conversation with the student
+
+            ---
+
+            CONTEXT:
+            {context_str}
+
+            CHAT HISTORY:
+            {history_str}
+
+            CURRENT STUDENT QUESTION:
+            {query}
+
+            ---
+
+            RESPONSE INSTRUCTIONS:
+            - Your answer must be based ONLY on the CONTEXT above. 
+            - Use CHAT HISTORY to maintain continuity and avoid repeating earlier answers.
+            - If required information is missing from CONTEXT, say so and recommend contacting:
+            - Undergraduate: ug-advising@cs.columbia.edu
+            - MS/Bridge: ms-advising@cs.columbia.edu
+            - PhD: phd-advising@cs.columbia.edu
+            - Career: career@cs.columbia.edu
+
+            - Answer clearly and concisely (3–5 full sentences). Do not speculate or add unsupported content.
+            """
+
+        prompt_template = f"""
+        You are a CS Academic Advising Assistant at Columbia University.
+        
+        Your goal is to answer the student's current question based on:
+            1. CONTEXT: reliable information retrieved from university sources
+            2. CHAT HISTORY: prior conversation with the student
+        Please help students to understand course requirements or make informed decisions about their academic path.
+
+        ---
 
         CONTEXT:
         {context_str}
@@ -356,40 +393,59 @@ class EnhancedCSAssistant:
         USER QUESTION:
         {query}
 
-        GUIDELINES FOR YOUR RESPONSE:
-        1. Be concise and clear (3-5 sentences per section)
-        2. Only mention course codes that appear in the context
-        3. Structure your response as follows:
-        - Core Requirements (if any)
-        - Track-Specific Requirements (if any)
-        - Electives or Additional Courses (if any)
-        4. If information is incomplete or unclear, recommend contacting:
-        - For Undergraduate: ug-advising@cs.columbia.edu
-        - For MS/Bridge: ms-advising@cs.columbia.edu
-        - For PhD: phd-advising@cs.columbia.edu
-        - For Career: career@cs.columbia.edu
+        ---
 
-        Remember: Only provide information that is directly supported by the context. Do not make assumptions or add information that isn't explicitly mentioned."""
+        GUIDELINES FOR YOUR RESPONSE:
+        1. Keep the answer concise (Max: 3-5 sentences), but provide full sentneces
+        2. Do NOT make assumptions or add extra details that isn't explicitly mentioned.
+        3. If information is incomplete or unclear, recommend contacting:
+
+            - For Undergraduate: ug-advising@cs.columbia.edu
+            - For MS/Bridge: ms-advising@cs.columbia.edu
+            - For PhD: phd-advising@cs.columbia.edu
+            - For Career: career@cs.columbia.edu
+
+        Remember: Only provide information that is directly supported by the context."""
 
         return prompt_template
+        
+    # Clarification Logic
+    def _needs_clarification(self, query: str) -> bool:
+        non_question_patterns = [
+            r"^(hi|hello|hey)\b",
+            r"^(thank you|thanks|bye)\b",
+            r"^(i'?m a|i am a)\s+(student|phd|ms|undergrad)",
+            r"^(can you help|who are you)",
+        ]
+        return any(re.match(p, query.lower().strip()) for p in non_question_patterns)
+
 
     @time_model_call
     async def chat(self, query: str) -> str:
         try:
-            # [add] update memory with the user's question
+            # 1. update memory with the user's question
             self.memory.chat_memory.add_user_message(query)
 
-            # Get relevant context
+            # 2. clarification logic
+            if self._needs_clarification(query):
+                clarification = (
+                    "Hi! Could you tell me more about what you're looking for? "
+                    "For example, are you asking about course requirements, track options, or application info?"
+                )
+                self.memory.chat_memory.add_ai_message(clarification)
+                return clarification
+            
+            # 3. Get relevant context
             context_docs = await self._get_relevant_context(query)
 
+            # 4. history string
             chat_history = self.memory.chat_memory.messages
             history_str = "\n".join([f"User: {m.content}" if isinstance(m, HumanMessage) else f"Assistant: {m.content}" for m in chat_history])
 
-            
-            # Build prompt with context
+            # 5. Build prompt with context
             prompt = self._build_prompt(query, context_docs, history_str)
             
-            # Get response from model using LangChain
+            # 6. Get response from model using LangChain
             response = ""
             async for chunk in self.llm.astream([{"role": "user", "content": prompt}]):
                 if chunk.content:

@@ -143,28 +143,67 @@ class CSAssistantAgent:
         Remember: Only provide information that is directly supported by the context. Do not make assumptions or add information that isn't explicitly mentioned."""
 
         return prompt_template
+    
+    # Clarification Logic
+    def _needs_clarification(self, query: str) -> bool:
+        non_question_patterns = [
+            r"^(hi|hello|hey)\b",
+            r"^(thank you|thanks|bye)\b",
+            r"^(i'?m a|i am a)\s+(student|phd|ms|undergrad)",
+            r"^(can you help|who are you)",
+        ]
+        return any(re.match(p, query.lower().strip()) for p in non_question_patterns)
+
+    def needs_clarification(self, query: str, context_docs: List[Document], threshold: int = 1) -> bool:
+        """Return True if context is too sparse or irrelevant"""
+        if not context_docs:
+            return True
+
+        match_count = sum([
+            any(kw.lower() in doc.page_content.lower() for kw in self.extract_keywords(query))
+            for doc in context_docs
+        ])
+        return match_count < threshold
+
+    def generate_clarification_question(self, query: str) -> str:
+        if "track" in query.lower():
+            return "Are you asking about MS tracks (like Machine Learning, Systems, etc.) or PhD specialization areas?"
+        elif "requirement" in query.lower():
+            return "Do you mean course requirements for a specific track or general graduation requirements?"
+        else:
+            return "Could you clarify your question so I can give you the most relevant information?"
+
 
     @time_model_call
     async def chat(self, query: str) -> str:
         """ memory -> context -> prompt -> model -> response """
         try:
-            # memory update
+            # 1. memory update
             self.memory.chat_memory.add_user_message(query)
 
-            # get context
+            # 2. clarification logic
+            if self._needs_clarification(query):
+                clarification = (
+                    "Hi! Could you tell me more about what you're looking for? "
+                    "For example, are you asking about course requirements, track options, or application info?"
+                )
+                self.memory.chat_memory.add_ai_message(clarification)
+                return clarification
+
+            # 3. get context
             context_docs = await self._get_relevant_context(query)
 
-            # history string
+            # 4. history string
             chat_history = self.memory.chat_memory.messages
             history_str = "\n".join([
                 f"User: {m.content}" if isinstance(m, HumanMessage) else f"Assistant: {m.content}"
                 for m in chat_history
             ])
 
-            # build prompt
+            # 5. build prompt
             prompt = self._build_prompt(query, context_docs, history_str)
 
-            # run LLM
+            # 6. run LLM
             response = ""
             async for chunk in self.llm.astream([{"role": "user", "content": prompt}]):
                 if chunk.content:
@@ -174,6 +213,7 @@ class CSAssistantAgent:
             self.memory.chat_memory.add_ai_message(cleaned)
 
             return cleaned + "\n\n"
+        
         except Exception as e:
             print(f"Agentic chat error: {e}")
             return f"Error processing request: {str(e)}"
