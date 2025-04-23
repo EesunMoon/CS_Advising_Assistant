@@ -5,3 +5,14 @@ Reference/
 advising/
 application.py
 test.py
+__pycache__/
+flask_session/
+OpenDeepSearch/
+chat_log.log
+mcp_server.log
+model_DeepSeek_Langchain.py
+model_timing.log
+test_web_retriever.py
+utils.py
+web_cache.pkl
+web_retriever.py
